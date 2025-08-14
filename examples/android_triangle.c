@@ -25,7 +25,7 @@ static int   g_pressed = 0;
 
 static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos)
 {
-    int fbw = 0, fbh = 0;
+    int fbw = 1080, fbh = 1920;
     glfwGetFramebufferSize(window, &fbw, &fbh);
     if (fbw <= 0 || fbh <= 0)
         return;
@@ -102,7 +102,7 @@ int main(void)
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     LOGI("Creating window");
-    GLFWwindow* window = glfwCreateWindow(0, 0, "GLFW Android Triangle", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1080, 1920, "GLFW Android Triangle", NULL, NULL);
     if (!window)
     {
         LOGE("glfwCreateWindow failed");
