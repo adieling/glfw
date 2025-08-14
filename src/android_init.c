@@ -26,30 +26,59 @@
 //========================================================================
 
 #include <android/log.h>
+#include <android/input.h>
+#include <android_native_app_glue.h>
 #include "internal.h"
 
 struct android_app* _globalApp;
 
 extern int main();
+static AInputQueue* s_attachedQueue = NULL;
+
 void handle_cmd(struct android_app* _app, int32_t cmd) {
     switch (cmd) {
-    case APP_CMD_INIT_WINDOW: {
+    case APP_CMD_INIT_WINDOW:
+        // Window surface is available; EGL/Vulkan surface could be (re)created by client
+        if (_app->window)
+            ANativeWindow_acquire(_app->window);
+        break;
+    case APP_CMD_GAINED_FOCUS:
+        if (_glfw.windowListHead)
+            _glfwInputWindowFocus(_glfw.windowListHead, GLFW_TRUE);
+        break;
+    case APP_CMD_LOST_FOCUS:
+        if (_glfw.windowListHead)
+            _glfwInputWindowFocus(_glfw.windowListHead, GLFW_FALSE);
+        break;
+    case APP_CMD_TERM_WINDOW:
+        // Surface is about to be destroyed; release it and notify client
+        if (_app->window)
+            ANativeWindow_release(_app->window);
+        if (_glfw.windowListHead)
+            _glfwInputWindowCloseRequest(_glfw.windowListHead);
+        break;
+    case APP_CMD_INPUT_CHANGED:
+        if (s_attachedQueue && s_attachedQueue != _app->inputQueue)
+            AInputQueue_detachLooper(s_attachedQueue);
+        if (_app->inputQueue)
+        {
+            AInputQueue_attachLooper(_app->inputQueue, _app->looper, LOOPER_ID_INPUT, NULL, NULL);
+            s_attachedQueue = _app->inputQueue;
+        }
+        else
+            s_attachedQueue = NULL;
+        break;
+    default:
         break;
     }
-    case APP_CMD_LOST_FOCUS: {
-        break;
-    }
-    case APP_CMD_GAINED_FOCUS: {
-        break;
-    }
-    case  APP_CMD_TERM_WINDOW: {
-        glfwDestroyWindow((GLFWwindow *) _glfw.windowListHead);
-    }
-}
 }
 
 // Android Entry Point
 void android_main(struct android_app *app) {
+    // Prevent native_app_glue from being stripped by the linker
+    void app_dummy();
+    app_dummy();
+
     app->onAppCmd = handle_cmd;
     // hmmm...global....eek
     _globalApp = app;
@@ -68,6 +97,7 @@ int _glfwPlatformInit(void)
 
 void _glfwPlatformTerminate(void)
 {
+    _glfwTerminateEGL();
     _glfwTerminateOSMesa();
 }
 

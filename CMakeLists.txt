@@ -1,13 +1,42 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.5)
 
 project(GLFW C)
+
+# Auto-detect Android NDK and toolchain file if building for ANDROID
+if (ANDROID)
+    if (NOT DEFINED ANDROID_NDK)
+        if (DEFINED CMAKE_ANDROID_NDK)
+            set(ANDROID_NDK ${CMAKE_ANDROID_NDK})
+        elseif(DEFINED ENV{ANDROID_NDK})
+            set(ANDROID_NDK $ENV{ANDROID_NDK})
+        elseif(DEFINED ENV{ANDROID_NDK_HOME})
+            set(ANDROID_NDK $ENV{ANDROID_NDK_HOME})
+        elseif(DEFINED ENV{ANDROID_HOME})
+            file(GLOB _ndk_dirs "$ENV{ANDROID_HOME}/ndk/*")
+            list(SORT _ndk_dirs DESC)
+            list(GET _ndk_dirs 0 ANDROID_NDK_CANDIDATE)
+            if (ANDROID_NDK_CANDIDATE)
+                set(ANDROID_NDK ${ANDROID_NDK_CANDIDATE})
+            endif()
+        elseif(DEFINED ENV{ANDROID_SDK_ROOT})
+            file(GLOB _ndk_dirs "$ENV{ANDROID_SDK_ROOT}/ndk/*")
+            list(SORT _ndk_dirs DESC)
+            list(GET _ndk_dirs 0 ANDROID_NDK_CANDIDATE)
+            if (ANDROID_NDK_CANDIDATE)
+                set(ANDROID_NDK ${ANDROID_NDK_CANDIDATE})
+            endif()
+        endif()
+    endif()
+    if (NOT CMAKE_TOOLCHAIN_FILE AND ANDROID_NDK)
+        set(CMAKE_TOOLCHAIN_FILE "${ANDROID_NDK}/build/cmake/android.toolchain.cmake" CACHE FILEPATH "Android toolchain file" FORCE)
+    endif()
+endif()
 
 set(CMAKE_LEGACY_CYGWIN_WIN32 OFF)
 
 if (NOT CMAKE_VERSION VERSION_LESS "3.0")
-    # Until all major package systems have moved to CMake 3,
-    # we stick with the older INSTALL_NAME_DIR mechanism
-    cmake_policy(SET CMP0042 OLD)
+    # Use modern behavior for MACOSX_RPATH policy
+    cmake_policy(SET CMP0042 NEW)
 endif()
 
 if (NOT CMAKE_VERSION VERSION_LESS "3.1")
@@ -168,9 +197,13 @@ elseif (WIN32)
 elseif (APPLE)
     set(_GLFW_COCOA 1)
     message(STATUS "Using Cocoa for window creation")
-elseif (ANDROID)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(_GLFW_ANDROID 1)
+    add_definitions(-DVK_USE_PLATFORM_ANDROID_KHR)
     message(STATUS "Using Android for window creation")
+    list(APPEND glfw_INCLUDE_DIRS "${ANDROID_NDK}/sources/android/native_app_glue/")
+    list(APPEND glfw_LIBRARIES android log EGL GLESv2)
+
 elseif (UNIX)
     set(_GLFW_X11 1)
     message(STATUS "Using X11 for window creation")
@@ -338,6 +371,8 @@ endif()
 #--------------------------------------------------------------------
 if (_GLFW_ANDROID)
     list(APPEND glfw_INCLUDE_DIRS "${ANDROID_NDK}/sources/android/native_app_glue/")
+    # Link against required Android NDK libraries
+    list(APPEND glfw_LIBRARIES android log EGL GLESv2)
 endif()
 
 #--------------------------------------------------------------------
@@ -349,6 +384,13 @@ endforeach()
 foreach(arg ${glfw_PKG_LIBS})
     set(GLFW_PKG_LIBS "${GLFW_PKG_LIBS} ${arg}")
 endforeach()
+
+# If building for Android, force-disable examples/tests/docs from root
+if (CMAKE_SYSTEM_NAME STREQUAL "Android" OR ANDROID)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+endif()
 
 #--------------------------------------------------------------------
 # Create generated files

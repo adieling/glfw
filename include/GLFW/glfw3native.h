@@ -569,6 +569,8 @@ GLFWAPI OSMesaContext glfwGetOSMesaContext(GLFWwindow* window);
 
 #if defined(GLFW_EXPOSE_NATIVE_ANDROID)
 GLFWAPI struct android_app * glfwGetAndroidApp(GLFWwindow* window);
+/* Returns the ANativeWindow* for the given window (Android only). */
+GLFWAPI struct ANativeWindow* glfwGetAndroidNativeWindow(GLFWwindow* window);
 #endif
 
 #ifdef __cplusplus

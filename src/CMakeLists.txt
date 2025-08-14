@@ -66,8 +66,35 @@ elseif (_GLFW_OSMESA)
 elseif (_GLFW_ANDROID)
     set(glfw_HEADERS ${common_HEADERS} android_platform.h android_joystick.h
                      posix_time.h posix_thread.h)
-    set(glfw_SOURCES ${common_SOURCES} android_init.c android_monitor.c android_window.c
-                     android_joystick.c posix_time.c posix_thread.c egl_context.c osmesa_context.c "${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c")
+
+    # Locate native_app_glue.c in the provided NDK or in the SDK tree
+    set(NATIVE_APP_GLUE_C "")
+    if (DEFINED ANDROID_NDK)
+        if (EXISTS "${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c")
+            set(NATIVE_APP_GLUE_C "${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c")
+            list(APPEND glfw_INCLUDE_DIRS "${ANDROID_NDK}/sources/android/native_app_glue/")
+        endif()
+    endif()
+    if (NOT NATIVE_APP_GLUE_C AND DEFINED ANDROID_SDK_ROOT)
+        file(GLOB _ndk_candidates "${ANDROID_SDK_ROOT}/ndk/*")
+        list(SORT _ndk_candidates DESC)
+        foreach(_cand ${_ndk_candidates})
+            if (EXISTS "${_cand}/sources/android/native_app_glue/android_native_app_glue.c")
+                set(NATIVE_APP_GLUE_C "${_cand}/sources/android/native_app_glue/android_native_app_glue.c")
+                list(APPEND glfw_INCLUDE_DIRS "${_cand}/sources/android/native_app_glue/")
+                break()
+            endif()
+        endforeach()
+    endif()
+
+    if (NATIVE_APP_GLUE_C)
+        set(glfw_SOURCES ${common_SOURCES} android_init.c android_monitor.c android_window.c
+                         android_joystick.c posix_time.c posix_thread.c egl_context.c osmesa_context.c "${NATIVE_APP_GLUE_C}")
+    else()
+        message(WARNING "android_native_app_glue.c not found. Proceeding without bundling it; ensure your app links it.")
+        set(glfw_SOURCES ${common_SOURCES} android_init.c android_monitor.c android_window.c
+                         android_joystick.c posix_time.c posix_thread.c egl_context.c osmesa_context.c)
+    endif()
 endif()
 
 if (APPLE)

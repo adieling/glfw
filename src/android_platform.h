@@ -33,14 +33,23 @@
 #include "posix_thread.h"
 #include "android_joystick.h"
 #include <android/native_window.h>
+#include <android/input.h>
+#include <android/keycodes.h>
 #include <android_native_app_glue.h>
 
 #define _glfw_dlopen(name) dlopen(name, RTLD_LAZY | RTLD_LOCAL)
 #define _glfw_dlclose(handle) dlclose(handle)
 #define _glfw_dlsym(handle, name) dlsym(handle, name)
 
-#define _GLFW_EGL_NATIVE_WINDOW  ((EGLNativeWindowType) window->android->window)
-#define _GLFW_PLATFORM_WINDOW_STATE         struct android_app* android;
+#define _GLFW_EGL_NATIVE_WINDOW  ((EGLNativeWindowType) window->android.nativeWindow)
+typedef struct _GLFWwindowAndroid {
+    struct android_app* app;
+    ANativeWindow*      nativeWindow;
+    double              cursorX;
+    double              cursorY;
+} _GLFWwindowAndroid;
+
+#define _GLFW_PLATFORM_WINDOW_STATE         _GLFWwindowAndroid android;
 #define _GLFW_PLATFORM_LIBRARY_WINDOW_STATE android_gstate gstate;
 #define _GLFW_PLATFORM_MONITOR_STATE
 #define _GLFW_PLATFORM_CURSOR_STATE
@@ -49,7 +58,7 @@
 #define _GLFW_PLATFORM_LIBRARY_CONTEXT_STATE
 #define _GLFW_EGL_NATIVE_DISPLAY EGL_DEFAULT_DISPLAY
 
-float x,y;
+// Per-window cursor state now lives in _GLFWwindowAndroid; no global cursor
 
 typedef struct android_gstate {
     struct android_app* app;

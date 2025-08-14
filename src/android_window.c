@@ -26,28 +26,80 @@
 //========================================================================
 
 #include "internal.h"
+#include <string.h>
+
+static int mapAndroidKeyToGlfw(int akey)
+{
+    switch (akey)
+    {
+        case AKEYCODE_BACK: return GLFW_KEY_ESCAPE; // or special-case Back
+        case AKEYCODE_ENTER: return GLFW_KEY_ENTER;
+        case AKEYCODE_DEL: return GLFW_KEY_BACKSPACE;
+        case AKEYCODE_SPACE: return GLFW_KEY_SPACE;
+        case AKEYCODE_TAB: return GLFW_KEY_TAB;
+        case AKEYCODE_DPAD_LEFT: return GLFW_KEY_LEFT;
+        case AKEYCODE_DPAD_RIGHT: return GLFW_KEY_RIGHT;
+        case AKEYCODE_DPAD_UP: return GLFW_KEY_UP;
+        case AKEYCODE_DPAD_DOWN: return GLFW_KEY_DOWN;
+        default: return akey; // fallback: use android keycode as scancode
+    }
+}
 
 static int32_t handle_input(struct android_app* app, AInputEvent* event)
 {
+    _GLFWwindow* win = _glfw.windowListHead;
+
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION)
-        for (size_t i = 0; i < AMotionEvent_getPointerCount(event); ++i)
+    {
+        const int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+        const size_t index = (AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+        const float px = AMotionEvent_getX(event, index);
+        const float py = AMotionEvent_getY(event, index);
+
+        if (win)
         {
-            x = AMotionEvent_getX(event, i);
-            y = AMotionEvent_getY(event, i);
+            win->android.cursorX = px;
+            win->android.cursorY = py;
+            _glfwInputCursorPos(win, px, py);
+
+            // Simple touch->mouse emulation for primary pointer
+            if (index == 0)
+            {
+                if (action == AMOTION_EVENT_ACTION_DOWN || action == AMOTION_EVENT_ACTION_POINTER_DOWN)
+                    _glfwInputMouseClick(win, GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS, 0);
+                else if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_POINTER_UP)
+                    _glfwInputMouseClick(win, GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE, 0);
+            }
         }
-    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY)
-        _glfwInputKey(_glfw.windowListHead, 0 , AKeyEvent_getKeyCode(event), GLFW_PRESS,0);
+        return 1;
+    }
+    else if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY)
+    {
+        const int aaction = AKeyEvent_getAction(event);
+        int action = (aaction == AKEY_EVENT_ACTION_DOWN) ? GLFW_PRESS :
+                     (aaction == AKEY_EVENT_ACTION_UP)   ? GLFW_RELEASE : GLFW_REPEAT;
+        const int akey = AKeyEvent_getKeyCode(event);
+        const int key = mapAndroidKeyToGlfw(akey);
+        if (win)
+            _glfwInputKey(win, key, akey, action, 0);
+        return 1;
+    }
 
     return 0;
 }
 
-static void handleEvents(int timeout) {
-    ALooper_pollOnce(0, NULL, NULL,(void**)&_glfw.gstate.source);
-
-    if (_glfw.gstate.source != NULL) {
-        _glfw.gstate.source->process(_glfw.gstate.app, _glfw.gstate.source);
+static void handleEvents(int timeout)
+{
+    int ident;
+    do
+    {
+        ident = ALooper_pollOnce(timeout, NULL, NULL, (void**) &_glfw.gstate.source);
+        if (_glfw.gstate.source)
+            _glfw.gstate.source->process(_glfw.gstate.app, _glfw.gstate.source);
+        // After the first poll, do not block again in this call
+        timeout = 0;
     }
-    _glfwInputCursorPos(_glfw.windowListHead, x, y);
+    while (ident >= 0);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -63,9 +115,12 @@ int _glfwPlatformCreateWindow(_GLFWwindow* window,
     while (_glfw.gstate.app->window == NULL) {
         handleEvents(-1);
     }
-    // hmmm maybe should be ANative_Window only?
-    window->android = _glfw.gstate.app;
-    window->android->onInputEvent = handle_input;
+    // Attach per-window Android state
+    window->android.app = _glfw.gstate.app;
+    window->android.nativeWindow = _glfw.gstate.app->window;
+    window->android.cursorX = 0.0;
+    window->android.cursorY = 0.0;
+    _glfw.gstate.app->onInputEvent = handle_input;
 
     //ANativeWindow_setBuffersGeometry(window->android->window, wndconfig->width, wndconfig->height, 0);
 
@@ -96,7 +151,9 @@ void _glfwPlatformDestroyWindow(_GLFWwindow* window)
 {
     if (window->context.destroy)
         window->context.destroy(window);
-    ANativeActivity_finish(window->android->activity);
+    // Do not force-finish the Activity here; let the app control its lifecycle
+    window->android.nativeWindow = NULL;
+    window->android.app = NULL;
 }
 
 void _glfwPlatformSetWindowTitle(_GLFWwindow* window, const char* title)
@@ -128,9 +185,9 @@ void _glfwPlatformSetWindowPos(_GLFWwindow* window, int xpos, int ypos)
 void _glfwPlatformGetWindowSize(_GLFWwindow* window, int* width, int* height)
 {
     if (height)
-        *height = ANativeWindow_getHeight(window->android->window);
+        *height = ANativeWindow_getHeight(window->android.nativeWindow);
     if (width)
-        *width = ANativeWindow_getWidth(window->android->window);
+        *width = ANativeWindow_getWidth(window->android.nativeWindow);
 }
 
 void _glfwPlatformSetWindowSize(_GLFWwindow* window, int width, int height)
@@ -160,6 +217,12 @@ void _glfwPlatformGetWindowFrameSize(_GLFWwindow* window,
                                      int* left, int* top,
                                      int* right, int* bottom)
 {
+}
+
+void _glfwPlatformGetWindowContentScale(_GLFWwindow* window, float* xscale, float* yscale)
+{
+    if (xscale) *xscale = 1.f;
+    if (yscale) *yscale = 1.f;
 }
 
 void _glfwPlatformIconifyWindow(_GLFWwindow* window)
@@ -227,6 +290,21 @@ int _glfwPlatformWindowVisible(_GLFWwindow* window)
     return GLFW_FALSE;
 }
 
+int _glfwPlatformWindowHovered(_GLFWwindow* window)
+{
+    return GLFW_FALSE;
+}
+
+float _glfwPlatformGetWindowOpacity(_GLFWwindow* window)
+{
+    return 1.f;
+}
+
+void _glfwPlatformSetWindowOpacity(_GLFWwindow* window, float opacity)
+{
+    (void)window; (void)opacity;
+}
+
 void _glfwPlatformPollEvents(void)
 {
     handleEvents(0);
@@ -249,9 +327,9 @@ void _glfwPlatformPostEmptyEvent(void)
 void _glfwPlatformGetCursorPos(_GLFWwindow* window, double* xpos, double* ypos)
 {
     if (xpos)
-        *xpos = x;
+        *xpos = window->android.cursorX;
     if (ypos)
-        *ypos = y;
+        *ypos = window->android.cursorY;
 }
 
 void _glfwPlatformSetCursorPos(_GLFWwindow* window, double x, double y)
@@ -282,13 +360,14 @@ void _glfwPlatformSetCursor(_GLFWwindow* window, _GLFWcursor* cursor)
 {
 }
 
-void _glfwPlatformSetClipboardString(_GLFWwindow* window, const char* string)
+void _glfwPlatformSetClipboardString(const char* string)
 {
+    (void) string; // Clipboard not supported on Android backend yet
 }
 
-const char* _glfwPlatformGetClipboardString(_GLFWwindow* window)
+const char* _glfwPlatformGetClipboardString(void)
 {
-    return NULL;
+    return NULL; // Clipboard not supported on Android backend yet
 }
 
 const char* _glfwPlatformGetScancodeName(int scancode)
@@ -342,7 +421,7 @@ VkResult _glfwPlatformCreateWindowSurface(VkInstance instance,
 
     memset(&sci, 0, sizeof(sci));
     sci.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
-    sci.window = window->android->window;
+    sci.window = window->android.nativeWindow;
 
     err = vkCreateAndroidSurfaceKHR(instance, &sci, allocator, surface);
     if (err)
@@ -363,5 +442,12 @@ GLFWAPI struct android_app * glfwGetAndroidApp(GLFWwindow* handle)
 {
     _GLFWwindow *window = (_GLFWwindow*)handle;
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
-    return window->android;
+    return window->android.app;
+}
+
+GLFWAPI struct ANativeWindow* glfwGetAndroidNativeWindow(GLFWwindow* handle)
+{
+    _GLFWwindow *window = (_GLFWwindow*)handle;
+    _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
+    return window->android.nativeWindow;
 }

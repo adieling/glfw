@@ -3,6 +3,15 @@ link_libraries(glfw)
 
 include_directories(${glfw_INCLUDE_DIRS} "${GLFW_SOURCE_DIR}/deps")
 
+# On Android, only build the android_triangle shared library and skip desktop examples
+if (CMAKE_SYSTEM_NAME STREQUAL "Android" OR ANDROID)
+    add_library(android_triangle SHARED android_triangle.c)
+    target_compile_definitions(android_triangle PRIVATE GLFW_EXPOSE_NATIVE_ANDROID)
+    target_link_libraries(android_triangle glfw GLESv2 android log)
+    set_target_properties(android_triangle PROPERTIES OUTPUT_NAME "android_triangle" FOLDER "GLFW3/Examples")
+    return()
+endif()
+
 if (MATH_LIBRARY)
     link_libraries("${MATH_LIBRARY}")
 endif()
@@ -37,6 +46,14 @@ add_executable(offscreen offscreen.c ${ICON} ${GLAD})
 add_executable(particles WIN32 MACOSX_BUNDLE particles.c ${ICON} ${TINYCTHREAD} ${GETOPT} ${GLAD})
 add_executable(sharing WIN32 MACOSX_BUNDLE sharing.c ${ICON} ${GLAD})
 add_executable(simple WIN32 MACOSX_BUNDLE simple.c ${ICON} ${GLAD})
+
+# Android-only triangle example using GLES2
+if (ANDROID)
+    add_library(android_triangle SHARED android_triangle.c)
+    target_compile_definitions(android_triangle PRIVATE GLFW_EXPOSE_NATIVE_ANDROID)
+    target_link_libraries(android_triangle glfw GLESv2 android log)
+    set_target_properties(android_triangle PROPERTIES OUTPUT_NAME "android_triangle")
+endif()
 add_executable(splitview WIN32 MACOSX_BUNDLE splitview.c ${ICON} ${GLAD})
 add_executable(wave WIN32 MACOSX_BUNDLE wave.c ${ICON} ${GLAD})
 
