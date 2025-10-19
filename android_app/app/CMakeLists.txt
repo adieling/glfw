@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.10)
 project(android_triangle_app C)
 
@@ -12,26 +13,27 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 # Add GLFW root; this will build the glfw target for Android
 add_subdirectory("${GLFW_ROOT}" "${CMAKE_BINARY_DIR}/glfw_root_build")
 
-# Our Android shared library using GLFW and GLES2
-add_library(android_triangle SHARED
-    "${GLFW_ROOT}/examples/android_triangle.c"
+# Our Android shared library using GLFW and Vulkan
+# INTERACTIVE version with touch demo
+add_library(android_vulkan_triangle SHARED
+    "../android_vulkan_triangle_interactive.c"
 )
 
-target_compile_definitions(android_triangle PRIVATE GLFW_INCLUDE_NONE)
+target_compile_definitions(android_vulkan_triangle PRIVATE GLFW_INCLUDE_NONE)
 
 # Include GLFW headers and deps
-target_include_directories(android_triangle PRIVATE
+target_include_directories(android_vulkan_triangle PRIVATE
     "${GLFW_ROOT}/include"
     "${GLFW_ROOT}/deps"
 )
 
-# Link against glfw and Android/GLES libs
+# Link against glfw and Android/Vulkan libs
 find_library(log-lib log)
 find_library(android-lib android)
-find_library(glesv2-lib GLESv2)
+find_package(Vulkan REQUIRED)
 
-target_link_libraries(android_triangle
-    PRIVATE glfw ${glesv2-lib} ${android-lib} ${log-lib}
+target_link_libraries(android_vulkan_triangle
+    PRIVATE glfw Vulkan::Vulkan ${android-lib} ${log-lib}
 )
 
-set_target_properties(android_triangle PROPERTIES OUTPUT_NAME "android_triangle")
+set_target_properties(android_vulkan_triangle PROPERTIES OUTPUT_NAME "android_vulkan_triangle")
