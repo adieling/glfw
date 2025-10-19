@@ -1,8 +1,8 @@
 [
 {
   "directory": "/home/adieling/code/glfw_android/android_app/app/.cxx/Debug/1o5v5c21/arm64-v8a",
-  "command": "/home/adieling/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/home/adieling/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/sysroot -DGLFW_INCLUDE_NONE -Dandroid_vulkan_triangle_EXPORTS -I/home/adieling/code/glfw_android/android_app/app/../../include -I/home/adieling/code/glfw_android/android_app/app/../../deps -I/home/adieling/code/glfw_android/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles/android_vulkan_triangle.dir/home/adieling/code/glfw_android/android_app/android_vulkan_triangle_interactive.c.o -c /home/adieling/code/glfw_android/android_app/android_vulkan_triangle_interactive.c",
-  "file": "/home/adieling/code/glfw_android/android_app/android_vulkan_triangle_interactive.c"
+  "command": "/home/adieling/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/home/adieling/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/sysroot -DGLFW_INCLUDE_NONE -Dandroid_vulkan_triangle_EXPORTS -I/home/adieling/code/glfw_android/android_app/app/../../include -I/home/adieling/code/glfw_android/android_app/app/../../deps -I/home/adieling/code/glfw_android/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles/android_vulkan_triangle.dir/home/adieling/code/glfw_android/android_app/android_vulkan_triangle.c.o -c /home/adieling/code/glfw_android/android_app/android_vulkan_triangle.c",
+  "file": "/home/adieling/code/glfw_android/android_app/android_vulkan_triangle.c"
 },
 {
   "directory": "/home/adieling/code/glfw_android/android_app/app/.cxx/Debug/1o5v5c21/arm64-v8a",

@@ -14,9 +14,9 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${GLFW_ROOT}" "${CMAKE_BINARY_DIR}/glfw_root_build")
 
 # Our Android shared library using GLFW and Vulkan
-# INTERACTIVE version with touch demo
+# Main working version (hardcoded vertices, Adreno 710 compatible)
 add_library(android_vulkan_triangle SHARED
-    "../android_vulkan_triangle_interactive.c"
+    "../android_vulkan_triangle.c"
 )
 
 target_compile_definitions(android_vulkan_triangle PRIVATE GLFW_INCLUDE_NONE)
