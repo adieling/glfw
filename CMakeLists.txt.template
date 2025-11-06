@@ -1,0 +1,137 @@
+####################################################################
+# CMakeLists.txt Template für Vulkan Android App mit GLFW Library
+#
+# Verwendung:
+#   1. Kopiere dieses Template zu: app/CMakeLists.txt
+#   2. Ersetze "my_vulkan_game" mit deinem App-Namen
+#   3. Passe die Quellen (*.c Dateien) an
+#   4. Passe include Pfade an wenn nötig
+####################################################################
+
+cmake_minimum_required(VERSION 3.10)
+project(my_vulkan_game C)
+
+# ═══════════════════════════════════════════════════════════════════
+# GLFW Library (vorkompiliert)
+# ═══════════════════════════════════════════════════════════════════
+
+# Absolute Path zur GLFW Library (anpassen wenn nötig)
+set(GLFW_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../glfw_prebuilt/lib")
+set(GLFW_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../glfw_prebuilt/include")
+
+# Import static library
+add_library(glfw STATIC IMPORTED GLOBAL)
+
+# Wähle richtige ABI-Version
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set_target_properties(glfw PROPERTIES
+        IMPORTED_LOCATION "${GLFW_LIB_DIR}/arm64-v8a/libglfw.a"
+    )
+elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set_target_properties(glfw PROPERTIES
+        IMPORTED_LOCATION "${GLFW_LIB_DIR}/armeabi-v7a/libglfw.a"
+    )
+elseif(ANDROID_ABI STREQUAL "x86_64")
+    set_target_properties(glfw PROPERTIES
+        IMPORTED_LOCATION "${GLFW_LIB_DIR}/x86_64/libglfw.a"
+    )
+else()
+    message(WARNING "Unsupported ABI: ${ANDROID_ABI}, falling back to arm64-v8a")
+    set_target_properties(glfw PROPERTIES
+        IMPORTED_LOCATION "${GLFW_LIB_DIR}/arm64-v8a/libglfw.a"
+    )
+endif()
+
+# Include-Directories für GLFW
+set_target_properties(glfw PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${GLFW_INCLUDE_DIR}"
+)
+
+# ═══════════════════════════════════════════════════════════════════
+# Dependencies und Include-Paths
+# ═══════════════════════════════════════════════════════════════════
+
+# Vulkan Headers (z.B. aus deps/)
+set(DEPS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../deps")
+
+# ═══════════════════════════════════════════════════════════════════
+# Deine Native Library
+# ═══════════════════════════════════════════════════════════════════
+
+add_library(my_vulkan_game SHARED
+    # Hauptquellen:
+    my_game.c
+    # Weitere Quellen hier hinzufügen:
+    # vulkan_init.c
+    # input.c
+)
+
+# Include-Directories für deine App
+target_include_directories(my_vulkan_game PRIVATE
+    "${GLFW_INCLUDE_DIR}"           # GLFW Headers
+    "${DEPS_DIR}"                    # Vulkan, linmath, etc.
+    "${DEPS_DIR}/vulkan/include"    # Vulkan spezifisch
+    "${CMAKE_CURRENT_SOURCE_DIR}"   # Lokale Headers
+)
+
+# Compiler-Flags
+target_compile_options(my_vulkan_game PRIVATE
+    -Wall
+    -Wextra
+    -fvisibility=hidden
+)
+
+# Optimierungen
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_options(my_vulkan_game PRIVATE -O3 -DNDEBUG)
+else()
+    target_compile_options(my_vulkan_game PRIVATE -g -O0)
+endif()
+
+# ═══════════════════════════════════════════════════════════════════
+# Linking
+# ═══════════════════════════════════════════════════════════════════
+
+target_link_libraries(my_vulkan_game
+    # GLFW Library
+    glfw
+    
+    # Android System Libraries
+    android          # Native Activity, AHardwareBuffer, etc.
+    log              # Logging (android/log.h)
+    
+    # Vulkan
+    Vulkan::Vulkan
+    
+    # Optional - für Thread-Support
+    # pthread
+)
+
+# ═══════════════════════════════════════════════════════════════════
+# Compiler-Definitionen
+# ═══════════════════════════════════════════════════════════════════
+
+target_compile_definitions(my_vulkan_game PRIVATE
+    GLFW_INCLUDE_NONE           # Wir nutzen Vulkan, nicht OpenGL
+    VK_USE_PLATFORM_ANDROID_KHR # Android-spezifisch
+)
+
+# ═══════════════════════════════════════════════════════════════════
+# Optional: Version Info
+# ═══════════════════════════════════════════════════════════════════
+
+set_target_properties(my_vulkan_game PROPERTIES
+    VERSION "1.0.0"
+    SOVERSION 1
+)
+
+# ═══════════════════════════════════════════════════════════════════
+# Information
+# ═══════════════════════════════════════════════════════════════════
+
+message(STATUS "Build Configuration:")
+message(STATUS "  Project: ${PROJECT_NAME}")
+message(STATUS "  Target:  my_vulkan_game")
+message(STATUS "  ABI:     ${ANDROID_ABI}")
+message(STATUS "  Build:   ${CMAKE_BUILD_TYPE}")
+message(STATUS "  GLFW:    ${GLFW_LIB_DIR}")
