@@ -79,8 +79,11 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     int fbw, fbh;
     glfwGetFramebufferSize(window, &fbw, &fbh);
     if (fbw <= 0 || fbh <= 0) return;
-    g_pushConsts.x = (float)((xpos / (double)fbw) * 2.0 - 1.0);
-    g_pushConsts.y = (float)(-((ypos / (double)fbh) * 2.0 - 1.0));
+    // Convert from screen coordinates to NDC (-1.0 to 1.0)
+    // X-Achse: left(-1) to right(+1)
+    // Y-Achse: top(-1) to bottom(+1) - note the negation to flip Y
+    g_pushConsts.y = (float)((xpos / (double)fbw) * 2.0 - 1.0);      // Swap: was x, now y
+    g_pushConsts.x = (float)(-((ypos / (double)fbh) * 2.0 - 1.0));   // Swap: was y, now x
 }
 
 static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
