@@ -1,43 +1,48 @@
-# GLFW Android Vulkan Demo & Porting Guide
+````markdown
+# GLFW Android App - Build Environment
 
-## 📋 Übersicht
+⚠️ **This is the Android Gradle build wrapper. For the actual Vulkan demo code, see [`../vulkan_demo/`](../vulkan_demo/)!**
 
-Dieses Projekt demonstriert **Vulkan auf Android mit GLFW** und bietet eine vollständige Anleitung zum Portieren von Desktop Vulkan-Anwendungen nach Android.
+## Overview
 
-### ✨ Features
+This directory contains the **Android Gradle project** that compiles a native Android app using GLFW.
 
-- ✅ **GLFW Integration** - Plattform-unabhängiges Window & Input Management
-- ✅ **Vulkan 1.0** - Maximale Kompatibilität mit mobilen GPUs
-- ✅ **Touch Support** - Interaktive Demo mit Touch-Reaktion
-- ✅ **Adreno GPU Support** - Getestet auf Qualcomm Adreno 710
-- ✅ **Production-Ready** - Vollständige Dokumentation für echte Projekte
-
-### 🎮 Demos
-
-1. **Hardcoded Triangle** (`android_vulkan_triangle_hardcoded.c`)
-   - Einfaches buntes Dreieck
-   - Minimaler Code für schnellen Start
-   - Adreno 710 kompatibel
-
-2. **Interactive Touch Demo** (`android_vulkan_triangle_interactive.c`)
-   - Dreieck folgt Finger
-   - Visuelles Feedback (Glow-Effekt)
-   - Push Constants für Echtzeit-Input
-   - **→ Aktuell aktiv!**
+The actual Vulkan implementation, shaders, and documentation have been moved to the separate `vulkan_demo/` directory because they form a self-contained demonstration project independent from GLFW core.
 
 ---
 
-## 🚀 Quick Start (5 Minuten)
+## Directory Structure
 
-### Voraussetzungen
+```
+android_app/
+├── README.md                    ← You are here
+├── app/
+│   ├── build.gradle             ← App module configuration
+│   ├── CMakeLists.txt           ← Points to ../../vulkan_demo/ for source
+│   └── src/main/
+│       ├── AndroidManifest.xml
+│       ├── java/                ← Java NativeActivity
+│       └── res/                 ← Resources
+├── build.gradle                 ← Root Gradle configuration
+├── settings.gradle
+├── local.properties             ← SDK/NDK paths (user-specific)
+├── gradlew / gradlew.bat        ← Gradle wrapper
+└── gradle/                      ← Gradle wrapper jars
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
 
 ```bash
-# Erforderlich:
-- Android SDK (API 24+, empfohlen 34)
+# Required:
+- Android SDK (API 24+, recommended 34)
 - Android NDK 26.1.10909125
 - CMake 3.22.1+
 - Java 17
-- USB-Debugging am Gerät aktiviert
+- USB debugging enabled
 ```
 
 ### Build & Install
@@ -45,60 +50,132 @@ Dieses Projekt demonstriert **Vulkan auf Android mit GLFW** und bietet eine voll
 ```bash
 cd android_app
 
-# 1. SDK/NDK Pfade setzen (einmalig)
+# 1. Configure SDK/NDK paths (one-time)
 echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 echo "ndk.dir=$HOME/Android/Sdk/ndk/26.1.10909125" >> local.properties
 
-# 2. Build
-./gradlew assembleDebug
+# 2. Build debug APK
+./gradlew clean assembleDebug
 
-# 3. Install & Run
+# 3. Install to device
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# 4. Launch app
 adb shell am start -S -n org.glfw.example/android.app.NativeActivity
 
-# 4. Logs ansehen
-adb logcat -s GLFW_VULKAN_TRIANGLE
+# 5. View logs
+adb logcat -d | grep "GLFW_VULKAN"
 ```
 
-**Berühren Sie den Bildschirm** - das Dreieck folgt Ihrem Finger! 🎨
+**Touch the screen** - the triangle follows your finger! 🎨
 
 ---
 
-## 📚 Dokumentation
+## ⭐ For the Actual Demo
 
-### Für Einsteiger
+See **[`../vulkan_demo/`](../vulkan_demo/)** for:
+- Vulkan C source code
+- Shader implementations
+- Complete documentation
+- Porting guides
+- Build scripts
 
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** ⭐
-  - Templates für alle wichtigen Dateien
-  - Copy-Paste fertige Code-Snippets
-  - Häufige Fehler & Lösungen
-  - One-Liner Commands
+---
 
-### Für Fortgeschrittene
+## 📋 Configuration Files
 
-- **[ANDROID_VULKAN_PORTING_GUIDE.md](ANDROID_VULKAN_PORTING_GUIDE.md)** 📖
-  - Vollständige Schritt-für-Schritt Anleitung
-  - Build-System Details (Gradle, CMake)
-  - Vulkan-Code Adaptierung
-  - Performance-Optimierungen
-  - Debugging & Profiling
-  - **→ Hauptdokumentation für Portierungen!**
+| File | Purpose |
+|------|---------|
+| `build.gradle` | Project-level Gradle configuration |
+| `app/build.gradle` | App module, dependencies, signing |
+| `app/CMakeLists.txt` | CMake build (points to vulkan_demo source) |
+| `local.properties` | SDK/NDK paths (not in git) |
+| `settings.gradle` | Gradle project structure |
 
-### Spezifische Themen
+---
 
-- **[SOLUTION_SUMMARY.md](SOLUTION_SUMMARY.md)** 🐛
-  - Adreno 710 GPU Bug Details
-  - OpVariable Private Array Problem
-  - SPIR-V Analyse
-  - Workarounds & Fixes
+## 🔧 Build Configuration
 
-- **[INTERACTIVE_DEMO.md](INTERACTIVE_DEMO.md)** 🎮
-  - Touch-Input Implementation
-  - Push Constants
-  - Shader-Effekte
-  - Erweiterungsmöglichkeiten
+### Key CMake Changes
 
-- **[DEBUGGING_NOTES.md](DEBUGGING_NOTES.md)** 🔍
+After moving code to `vulkan_demo/`, the CMakeLists.txt now references:
+
+```cmake
+# app/CMakeLists.txt
+add_library(android_vulkan_triangle SHARED
+    "../../vulkan_demo/android_vulkan_triangle.c"  # Updated path
+)
+```
+
+---
+
+## 🧪 Gradle Tasks
+
+```bash
+./gradlew tasks                 # List all available tasks
+./gradlew clean                 # Clean build artifacts
+./gradlew build                 # Build all variants
+./gradlew installDebug          # Build and install to device
+./gradlew lint                  # Run Android Lint checks
+```
+
+---
+
+## 🔍 Troubleshooting
+
+### Build Error: NDK not found
+```bash
+# Set NDK location properly
+echo "ndk.dir=$HOME/Android/Sdk/ndk/26.1.10909125" > local.properties
+```
+
+### CMake Error: Source files not found
+```bash
+# Verify vulkan_demo directory exists
+ls ../../vulkan_demo/*.c
+```
+
+### APK Installation Fails
+```bash
+# Check device connection
+adb devices
+
+# Check device CPU architecture
+adb shell getprop ro.product.cpu.abilist
+```
+
+---
+
+## 📚 Documentation
+
+All documentation and implementation details have moved to **`../vulkan_demo/`**:
+
+- **`ANDROID_VULKAN_PORTING_GUIDE.md`** - Complete step-by-step guide (8000+ lines)
+- **`QUICK_REFERENCE.md`** - Quick lookup for templates and snippets
+- **`SOLUTION_SUMMARY.md`** - Adreno 710 bug analysis
+- **`DEBUGGING_NOTES.md`** - Full debugging history
+- **`INTERACTIVE_DEMO.md`** - Touch input implementation
+- **`FIXES_APPLIED.md`** - Comprehensive fix documentation
+
+---
+
+## 🏗️ Java Integration
+
+The Android Java code provides:
+- **NativeActivity**: Entry point for native code
+- **JNI Bridge**: Communication with GLFW C code
+- **Lifecycle Management**: onCreate, onResume, onPause, onDestroy
+- **Input Routing**: Touch and keyboard events to GLFW
+
+---
+
+## 📄 License
+
+Same as GLFW (zlib/libpng)
+
+---
+
+**For the actual implementation, visit [`../vulkan_demo/`](../vulkan_demo/)!** �
   - Komplette Debugging-Historie
   - Error-Codes & Ursachen
   - Test-Resultate
