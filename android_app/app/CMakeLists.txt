@@ -2,39 +2,57 @@
 cmake_minimum_required(VERSION 3.10)
 project(android_triangle_app C)
 
-# Path to GLFW repo root (two levels up from this app folder)
-set(GLFW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+# === Using PREBUILT GLFW libraries ===
+# Much faster build: no need to compile GLFW from source
 
-# Ensure examples/tests/docs are not built from GLFW root
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+# Get absolute path to project root (glfw_android/)
+# From app/CMakeLists.txt, go up 2 levels to reach glfw_android/
+get_filename_component(GLFW_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
-# Add GLFW root; this will build the glfw target for Android
-add_subdirectory("${GLFW_ROOT}" "${CMAKE_BINARY_DIR}/glfw_root_build")
+set(GLFW_PREBUILT "${GLFW_PROJECT_ROOT}/glfw_prebuilt")
+set(GLFW_ROOT "${GLFW_PROJECT_ROOT}")  # Still needed for Vulkan deps
+
+message(STATUS "GLFW Project Root: ${GLFW_PROJECT_ROOT}")
+message(STATUS "GLFW Prebuilt: ${GLFW_PREBUILT}")
+
+# Determine ABI and set prebuilt lib path
+if(CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+    set(GLFW_LIB_PATH "${GLFW_PREBUILT}/lib/arm64-v8a")
+    message(STATUS "Using prebuilt GLFW for arm64-v8a at: ${GLFW_LIB_PATH}")
+elseif(CMAKE_ANDROID_ARCH_ABI STREQUAL "x86_64")
+    set(GLFW_LIB_PATH "${GLFW_PREBUILT}/lib/x86_64")
+    message(STATUS "Using prebuilt GLFW for x86_64 at: ${GLFW_LIB_PATH}")
+else()
+    message(FATAL_ERROR "Unsupported ABI: ${CMAKE_ANDROID_ARCH_ABI}")
+endif()
 
 # Our Android shared library using GLFW and Vulkan
-# Main working version (arrays enabled, Adreno 710 compatible)
+# Interactive version: Triangle follows touch input (arrays enabled)
 # Source moved to vulkan_demo directory
 add_library(android_vulkan_triangle SHARED
-    "../../vulkan_demo/android_vulkan_triangle.c"
+    "../../vulkan_demo/android_vulkan_triangle_interactive.c"
 )
 
 target_compile_definitions(android_vulkan_triangle PRIVATE GLFW_INCLUDE_NONE)
 
-# Include GLFW headers and deps
+# Include prebuilt GLFW headers and Vulkan deps from GLFW root
 target_include_directories(android_vulkan_triangle PRIVATE
-    "${GLFW_ROOT}/include"
-    "${GLFW_ROOT}/deps"
+    "${GLFW_PREBUILT}/include"  # GLFW headers (glfw3.h, glfw3native.h)
+    "${GLFW_ROOT}/deps"         # Vulkan headers
 )
 
-# Link against glfw and Android/Vulkan libs
+# Link against prebuilt GLFW and Android/Vulkan libs
 find_library(log-lib log)
 find_library(android-lib android)
 find_package(Vulkan REQUIRED)
 
+# Link prebuilt libglfw.a (static library)
 target_link_libraries(android_vulkan_triangle
-    PRIVATE glfw Vulkan::Vulkan ${android-lib} ${log-lib}
+    PRIVATE 
+    "${GLFW_LIB_PATH}/libglfw.a"  # Prebuilt static GLFW library
+    Vulkan::Vulkan 
+    ${android-lib} 
+    ${log-lib}
 )
 
 set_target_properties(android_vulkan_triangle PROPERTIES OUTPUT_NAME "android_vulkan_triangle")
