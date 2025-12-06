@@ -47,6 +47,13 @@ typedef struct _GLFWwindowAndroid {
     ANativeWindow*      nativeWindow;
     double              cursorX;
     double              cursorY;
+    // Gesture state
+    float               gestureStartX;
+    float               gestureStartY;
+    int                 gestureTracking;
+    int                 maxPointerCount;
+    int                 tapCount;
+    long                lastTapTime;
 } _GLFWwindowAndroid;
 
 #define _GLFW_PLATFORM_WINDOW_STATE         _GLFWwindowAndroid android;

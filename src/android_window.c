@@ -27,6 +27,7 @@
 
 #include "internal.h"
 #include <string.h>
+#include <time.h>
 
 static int mapAndroidKeyToGlfw(int akey)
 {
@@ -62,13 +63,168 @@ static int32_t handle_input(struct android_app* app, AInputEvent* event)
             win->android.cursorY = py;
             _glfwInputCursorPos(win, px, py);
 
-            // Simple touch->mouse emulation for primary pointer
+            // Check for tap timeout - execute pending action if no more taps coming
+            if (action != AMOTION_EVENT_ACTION_DOWN) {
+                struct timespec now;
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                long currentTime = now.tv_sec * 1000 + now.tv_nsec / 1000000;
+                const long TAP_TIMEOUT = 400;
+                
+                if (win->android.tapCount > 0 && currentTime - win->android.lastTapTime > TAP_TIMEOUT) {
+                    // Timeout reached - execute pending tap action
+                    if (win->android.tapCount == 3) {
+                        _glfwInputKey(win, GLFW_KEY_T, 0, GLFW_PRESS, 0);
+                        _glfwInputKey(win, GLFW_KEY_T, 0, GLFW_RELEASE, 0);
+                    } else if (win->android.tapCount == 4) {
+                        _glfwInputKey(win, GLFW_KEY_O, 0, GLFW_PRESS, 0);
+                        _glfwInputKey(win, GLFW_KEY_O, 0, GLFW_RELEASE, 0);
+                    } else if (win->android.tapCount == 1 || win->android.tapCount == 2) {
+                        _glfwInputKey(win, GLFW_KEY_ENTER, 0, GLFW_PRESS, 0);
+                        _glfwInputKey(win, GLFW_KEY_ENTER, 0, GLFW_RELEASE, 0);
+                    }
+                    win->android.tapCount = 0;
+                }
+            }
+
+            // Touch event handling
             if (index == 0)
             {
-                if (action == AMOTION_EVENT_ACTION_DOWN || action == AMOTION_EVENT_ACTION_POINTER_DOWN)
+                // Update max pointer count for multi-touch gesture detection
+                int currentPointerCount = AMotionEvent_getPointerCount(event);
+                if (currentPointerCount > win->android.maxPointerCount) {
+                    win->android.maxPointerCount = currentPointerCount;
+                }
+
+                if (action == AMOTION_EVENT_ACTION_DOWN)
+                {
+                    // Mouse click for menu interaction
                     _glfwInputMouseClick(win, GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS, 0);
-                else if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_POINTER_UP)
+                    
+                    // Start gesture tracking
+                    win->android.gestureStartX = px;
+                    win->android.gestureStartY = py;
+                    win->android.gestureTracking = 1;
+                    win->android.maxPointerCount = currentPointerCount;
+                }
+                else if (action == AMOTION_EVENT_ACTION_MOVE)
+                {
+                    // Continuous mouse position update for smooth menu interaction
+                    _glfwInputCursorPos(win, px, py);
+                }
+                else if (action == AMOTION_EVENT_ACTION_UP)
+                {
+                    // Mouse release for menu interaction
                     _glfwInputMouseClick(win, GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE, 0);
+                    
+                    // Detect swipe/tap and emit keyboard events
+                    if (win->android.gestureTracking)
+                    {
+                        float dx = px - win->android.gestureStartX;
+                        float dy = py - win->android.gestureStartY;
+                        float absDx = dx > 0 ? dx : -dx;
+                        float absDy = dy > 0 ? dy : -dy;
+                        const float SWIPE_THRESHOLD = 80.0f;
+                        const float TAP_THRESHOLD = 30.0f;
+                        
+                        int pointerCount = win->android.maxPointerCount;
+
+                        // Single finger or no multi-touch specified
+                        if (pointerCount == 1 || action == AMOTION_EVENT_ACTION_UP)
+                        {
+                            // Detect if it's a swipe or tap
+                            if (absDx > SWIPE_THRESHOLD || absDy > SWIPE_THRESHOLD)
+                            {
+                                // Swipe gesture
+                                if (absDx > absDy)
+                                {
+                                    // Horizontal swipe
+                                    if (dx > 0)
+                                    {
+                                        // Swipe Right -> Right Arrow (or D with ALT for gameplay)
+                                        _glfwInputKey(win, GLFW_KEY_RIGHT, 0, GLFW_PRESS, 0);
+                                        _glfwInputKey(win, GLFW_KEY_RIGHT, 0, GLFW_RELEASE, 0);
+                                    }
+                                    else
+                                    {
+                                        // Swipe Left -> Left Arrow (or A with ALT for gameplay)
+                                        _glfwInputKey(win, GLFW_KEY_LEFT, 0, GLFW_PRESS, 0);
+                                        _glfwInputKey(win, GLFW_KEY_LEFT, 0, GLFW_RELEASE, 0);
+                                    }
+                                }
+                                else
+                                {
+                                    // Vertical swipe
+                                    if (dy > 0)
+                                    {
+                                        // Swipe Down -> Down Arrow (or S with ALT for gameplay)
+                                        _glfwInputKey(win, GLFW_KEY_DOWN, 0, GLFW_PRESS, 0);
+                                        _glfwInputKey(win, GLFW_KEY_DOWN, 0, GLFW_RELEASE, 0);
+                                    }
+                                    else
+                                    {
+                                        // Swipe Up -> Up Arrow (or W with ALT for gameplay)
+                                        _glfwInputKey(win, GLFW_KEY_UP, 0, GLFW_PRESS, 0);
+                                        _glfwInputKey(win, GLFW_KEY_UP, 0, GLFW_RELEASE, 0);
+                                    }
+                                }
+                            }
+                            else if (absDx < TAP_THRESHOLD && absDy < TAP_THRESHOLD)
+                            {
+                                // Tap gesture - detect multi-taps for T (3x) and O (4x)
+                                struct timespec now;
+                                clock_gettime(CLOCK_MONOTONIC, &now);
+                                long currentTime = now.tv_sec * 1000 + now.tv_nsec / 1000000;
+                                const long TAP_TIMEOUT = 400; // 400ms window for multi-tap
+                                
+                                // Check if this is a new tap or continuation of previous taps
+                                if (currentTime - win->android.lastTapTime > TAP_TIMEOUT) {
+                                    // New tap sequence (or timeout, execute previous action)
+                                    if (win->android.tapCount == 3) {
+                                        // Execute T toggle (from previous 3-tap)
+                                        _glfwInputKey(win, GLFW_KEY_T, 0, GLFW_PRESS, 0);
+                                        _glfwInputKey(win, GLFW_KEY_T, 0, GLFW_RELEASE, 0);
+                                    } else if (win->android.tapCount == 4) {
+                                        // Execute O toggle (from previous 4-tap)
+                                        _glfwInputKey(win, GLFW_KEY_O, 0, GLFW_PRESS, 0);
+                                        _glfwInputKey(win, GLFW_KEY_O, 0, GLFW_RELEASE, 0);
+                                    } else if (win->android.tapCount == 1) {
+                                        // Execute Enter (from previous single tap)
+                                        _glfwInputKey(win, GLFW_KEY_ENTER, 0, GLFW_PRESS, 0);
+                                        _glfwInputKey(win, GLFW_KEY_ENTER, 0, GLFW_RELEASE, 0);
+                                    }
+                                    // Start new sequence
+                                    win->android.tapCount = 1;
+                                } else {
+                                    // Continuation of tap sequence
+                                    win->android.tapCount++;
+                                }
+                                
+                                win->android.lastTapTime = currentTime;
+                            }
+                        }
+                        else if (pointerCount == 2)
+                        {
+                            // Two finger swipe for Q/E (up/down camera)
+                            if (absDx > SWIPE_THRESHOLD && absDx > absDy)
+                            {
+                                if (dx > 0)
+                                {
+                                    // Swipe Right -> E (ALT+E)
+                                    _glfwInputKey(win, GLFW_KEY_E, 0, GLFW_PRESS, GLFW_MOD_ALT);
+                                    _glfwInputKey(win, GLFW_KEY_E, 0, GLFW_RELEASE, GLFW_MOD_ALT);
+                                }
+                                else
+                                {
+                                    // Swipe Left -> Q (ALT+Q)
+                                    _glfwInputKey(win, GLFW_KEY_Q, 0, GLFW_PRESS, GLFW_MOD_ALT);
+                                    _glfwInputKey(win, GLFW_KEY_Q, 0, GLFW_RELEASE, GLFW_MOD_ALT);
+                                }
+                            }
+                        }
+                        
+                        win->android.gestureTracking = 0;
+                    }
+                }
             }
         }
         return 1;
@@ -120,6 +276,8 @@ int _glfwPlatformCreateWindow(_GLFWwindow* window,
     window->android.nativeWindow = _glfw.gstate.app->window;
     window->android.cursorX = 0.0;
     window->android.cursorY = 0.0;
+    window->android.tapCount = 0;
+    window->android.lastTapTime = 0;
     _glfw.gstate.app->onInputEvent = handle_input;
 
     //ANativeWindow_setBuffersGeometry(window->android->window, wndconfig->width, wndconfig->height, 0);
